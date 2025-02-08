@@ -5,18 +5,18 @@ from torch.utils.data import Dataset
 from typing import Tuple
 
 class FGSM:
-    def __init__(self, model: nn.Module, epsilon: float = 0.05, device=torch.device("cpu")):
+    def __init__(self, model: nn.Module, epsilon: float = 0.05):
         self.model = model
+        self.device = model.parameters().__next__().device
         self.epsilon = epsilon
         self.criterion = nn.CrossEntropyLoss()
-        self.device = device
     
     def generate(self, image: torch.Tensor, target: int) -> Tuple[torch.Tensor, torch.Tensor]:
         # Enable gradients for input image
         image.requires_grad = True
         
         # forward pass
-        output = self.model(image)
+        output = self.model(image.to(self.device))
         
         # Calculate loss
         loss = self.criterion(output, torch.tensor([target]).to(device))
@@ -55,7 +55,8 @@ if __name__ == "__main__":
     from model_inference import setup_model, ImageNetValidationDataset
 
     # Setup model
-    device = torch.device("cpu")
+    # device = torch.device("cpu")
+    device = torch.device("cuda")
     model = setup_model(device)
 
     # Setup validation data
@@ -112,6 +113,9 @@ if __name__ == "__main__":
     axes[1].set_title("Adversarial Image")
     plt.show()
 
+    # move images to the same device as model
+    image = image.to(device)
+    adversarial_image = adversarial_image.to(device)
 
     # Predict on image and adversarial image against label
     with torch.no_grad():
