@@ -5,7 +5,7 @@ from torch.utils.data import Dataset
 from typing import Tuple
 
 class FGSM:
-    def __init__(self, model: nn.Module, epsilon: float = 0.007, device=torch.device("cpu")):
+    def __init__(self, model: nn.Module, epsilon: float = 0.05, device=torch.device("cpu")):
         self.model = model
         self.epsilon = epsilon
         self.criterion = nn.CrossEntropyLoss()
@@ -36,18 +36,9 @@ class FGSM:
         
         return adversarial_image, perturbation
 
-def create_adversarial_transform(model: nn.Module, epsilon: float = 0.007):
-    fgsm = FGSM(model, epsilon)
-    
-    def transform(image: torch.Tensor, target: int) -> torch.Tensor:
-        adversarial_image, _ = fgsm.generate(image.unsqueeze(0), target)
-        return adversarial_image.squeeze(0)
-    
-    return transform
-
 
 class AdversarialDataset(Dataset):
-    def __init__(self, base_dataset, model, epsilon=0.007):
+    def __init__(self, base_dataset, model, epsilon=0.05):
         self.base_dataset = base_dataset
         self.fgsm = FGSM(model, epsilon)
         
@@ -76,8 +67,6 @@ if __name__ == "__main__":
 
     # Create adversarial transform
     epsilon = 0.05
-
-    adversarial_transform = create_adversarial_transform(model, epsilon)
 
     transform = transforms.Compose([
         transforms.Resize(256),
