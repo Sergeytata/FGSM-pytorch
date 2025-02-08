@@ -40,12 +40,12 @@ class ImageNetValidationDataset(Dataset):
             
         return image, label
 
-def setup_model():
+def setup_model(device=torch.device('cpu')):
     # Load pretrained ResNet18
     weights = ResNet18_Weights(ResNet18_Weights.DEFAULT)
     model = resnet18(weights=weights)
     model.eval()
-    return model.cuda() if torch.cuda.is_available() else model
+    return model.to(device) 
 
 def setup_validation_data(val_dir, batch_size=32):
     # Standard ImageNet transforms
@@ -103,16 +103,19 @@ def predict(model, val_loader):
 
 def main():
     # Set up model
-    model = setup_model()
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    model = setup_model(device)
     
     # Set ImageNet validation directory
     IMAGENET_1K_VAL_DIR = os.environ["IMAGENET_1K_VAL_DIR"]
 
     # Set up data loader
-    val_dataset, val_loader = setup_validation_data(IMAGENET_1K_VAL_DIR) # Update environment variable with path to ImageNet validation data
+    batch_size = 64
+    val_dataset, val_loader = setup_validation_data(IMAGENET_1K_VAL_DIR, batch_size=batch_size) # Update environment variable with path to ImageNet validation data
     
+    # Verify dataset size
     assert len(val_dataset) == 50000, "Validation dataset should have 50,000 images"
-    # return None
+    
     # Make predictions
     predictions, true_labels = predict(model, val_loader)
     
@@ -121,7 +124,7 @@ def main():
     print(f"Validation Accuracy: {accuracy:.4f}")
 
     # resnet18 validation acc@1: 0.6976
-    # verifies 69.758% accuracy stated by PyTorch - https://pytorch.org/vision/main/models/generated/torchvision.models.resnet18.html
+    # [Verified] PyTorch states 69.758% - https://pytorch.org/vision/main/models/generated/torchvision.models.resnet18.html
 
 if __name__ == "__main__":
     main()
