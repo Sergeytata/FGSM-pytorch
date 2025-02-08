@@ -19,7 +19,7 @@ class FGSM:
         output = self.model(image.to(self.device))
         
         # Calculate loss
-        loss = self.criterion(output, torch.tensor([target]).to(device))
+        loss = self.criterion(output, torch.tensor([target]).to(self.device))
         
         # backward pass
         loss.backward()
@@ -55,8 +55,8 @@ if __name__ == "__main__":
     from model_inference import setup_model, ImageNetValidationDataset
 
     # Setup model
-    # device = torch.device("cpu")
-    device = torch.device("cuda")
+    device = torch.device("cpu")
+    # device = torch.device("cuda")
     model = setup_model(device)
 
     # Setup validation data
@@ -87,8 +87,7 @@ if __name__ == "__main__":
     # Create adversarial dataset
     adversarial_dataset = AdversarialDataset(val_dataset, model, epsilon)
     
-    
-    # Predict on single image from dataset
+    # Experiment with a single image
     
     # Visualize image and adversarial image
     import matplotlib.pyplot as plt
