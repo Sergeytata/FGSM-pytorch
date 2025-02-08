@@ -155,6 +155,7 @@ def main():
     print(f"Validation Accuracy: {accuracy:.4f}")
 
     # resnet18 validation acc@1: 0.6976
+    # resnet18 adversarial validation acc@1: 0.0124
     # [Verified] PyTorch states 69.758% - https://pytorch.org/vision/main/models/generated/torchvision.models.resnet18.html
 
 if __name__ == "__main__":
