@@ -174,7 +174,7 @@ def main():
     assert len(val_dataset) == 50000, "Validation dataset should have 50,000 images"
 
     # FGSM
-    model_fgsm = setup_model(torch.device('cuda'))
+    model_fgsm = setup_model(device)
     fgsm = FGSM(model_fgsm, epsilon=0.05)
 
     # Benchmark original dataset
@@ -190,11 +190,6 @@ def main():
     print(f"Adversarial acc@1: {accuracy_top1_adver:.4f}")
     print(f"Adversarial acc@5: {accuracy_top5_adver:.4f}")
 
-    # resnet18 validation acc@1: 0.6976
-    # resnet18 adversarial validation acc@1: 0.0124
-    # [Verified] PyTorch states 69.758% - https://pytorch.org/vision/main/models/generated/torchvision.models.resnet18.html
 
 if __name__ == "__main__":
-    import torch.multiprocessing as mp
-    mp.set_start_method('spawn', force=True)
     main()
