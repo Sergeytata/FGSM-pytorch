@@ -26,6 +26,62 @@ git clone https://github.com/Sergeytata/FGSM-pytorch
 pip install -r requirements.txt
 ```
 
+## Usage
+The project comes with two examples to show how to use the adversarial transformation.
+
+single_image_example.py - adversarial transformation of a single image. A good starting point to understand how the adversarial transformation works and to evaluate the perceptual quality of the transformed image.
+```bash
+# single image is a self-contained example and does not require any additional setup.
+python single_image_example.py
+```
+
+
+model_inference.py - adversarial transformation of the ImageNet-1k-val dataset. This example illustrates how to integrate the adversarial transformation into the evaluation pipeline.
+```bash
+# model_inference.py requires the ImageNet-1k-val dataset to be downloaded and extracted.
+
+# Set IMAGENET_1K_VAL_DIR environment variable to the val directory of your ImageNet dataset.
+export IMAGENET_1K_VAL_DIR=%/path/to/imagenet%/val
+
+python model_inference.py
+```
+
+
+### Integration
+The project is designed as an integration with evaluation or training pipelines. adverarial_transform.py contains all the necessary classes to enable adversarial transformation of an image. 
+
+```python
+# %Your project imports%
+from adversarial_transform import FGSM
+
+
+# % Your project code%
+
+# Create FGSM object
+epsilon = 0.05
+fgsm = FGSM(model, epsilon)
+
+
+# Training or evaluation pipeline
+fgsm_device = fgsm.model.parameters().__next__().device
+
+# Training/Evaluation loop example
+for images, labels in tqdm(val_loader):
+    images = images.to(fgsm_device)
+    labels = labels.to(fgsm_device)
+    adversarail_images, _ = fgsm.generate(images, labels)
+
+    # %Your training loop in here%
+
+
+    # fgsm requires grads for perturbation calculation
+    # torch.no_grad() is used after adversarial transformation.
+    with torch.no_grad():
+        # %Your evaluation loop in here%
+
+```
+
+
 ## Project Structure
 adverarial_transform.py - adversarial transformation.
 single_image_example.py - single image adversarial transformation.
@@ -34,7 +90,7 @@ model_inference.py - ImageNet-1k-val benchmarking.
 ## Results
 I use resnet18, resnet50, and ConvNeXt Tiny models to benchmark the adversarial transformation on ImageNet-1k-val dataset with epsilon set to 0.05. 
 
-Additionally, I explore extrapolation of resnet18 as an FGSM model to measure the effectiveness of theis method on other models from the same family and not.
+Additionally, I explore extrapolation of resnet18 as an FGSM model to measure the effectiveness of the method on other unknown models from the same family and not.
 The results are shown in the table below:
 
 
