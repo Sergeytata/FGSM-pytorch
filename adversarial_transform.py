@@ -15,8 +15,6 @@ class FGSM:
         
         # forward pass
         output = self.model(image.to(self.device))
-
-        # print(output.shape, target.shape)
         
         # Calculate loss
         loss = self.criterion(output, target.to(self.device))
