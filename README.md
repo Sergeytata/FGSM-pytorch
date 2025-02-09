@@ -6,12 +6,12 @@ x_{adv} = x + \epsilon * sign(\nabla_x J(\theta, x, y))
 ```
 
 where:
-- x: input image
-- x_{adv}: adversarial image
-- \epsilon: perturbation magnitude
-- J: loss function
-- \theta: model parameters
-- y: target label
+- $x$: input image
+- $x_{adv}$: adversarial image
+- $\epsilon$: perturbation magnitude
+- $J$: loss function
+- $\theta$: model parameters
+- $y$: target label
 
 The project also includes a benchmarking of the adversarial transformation on ImageNet-1k-val dataset using ResNet18, ResNet50, and ConvNeXt Tiny models.
 
