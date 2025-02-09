@@ -10,7 +10,7 @@ import json
 from tqdm import tqdm
 import os
 
-from adversarial_transform import AdversarialDataset
+from adversarial_transform import AdversarialDataset, FGSM
 
 
 class ImageNetValidationDataset(Dataset):
@@ -105,54 +105,90 @@ def setup_validation_adversarial_data(val_dataset, model, epsilon=0.05, batch_si
     return adversarial_dataset, val_loader
 
 def predict(model, val_loader):
-    predictions = []
+    device = model.parameters().__next__().device
+    predictions_top1 = []
+    predictions_top5 = []
     true_labels = []
     
     for images, labels in tqdm(val_loader):
         with torch.no_grad():
-            if torch.cuda.is_available():
-                images = images.cuda()
+            images = images.to(device)
             
             outputs = model(images)
-            _, predicted = torch.max(outputs, 1)
+            _, predicted_top1 = torch.max(outputs, 1)
+            _, predicted_top5 = torch.topk(outputs, k=5, dim=1)
             
-            predictions.extend(predicted.cpu().numpy())
+            predictions_top1.extend(predicted_top1.cpu().numpy())
+            predictions_top5.extend(predicted_top5.cpu().numpy())
             true_labels.extend(labels.numpy())
     
-    return predictions, true_labels
+    return predictions_top1, predictions_top5, true_labels
+
+def predict_adversarial(model, val_loader, fgsm):
+    device = model.parameters().__next__().device
+    fgsm_device = fgsm.model.parameters().__next__().device
+    if device != fgsm_device:
+        print("[Warning]: Model and FGSM model should be on the same device!")
+    predictions_top1 = []
+    predictions_top5 = []
+    true_labels = []
+    
+    for images, labels in tqdm(val_loader):
+        images = images.to(fgsm_device)
+        labels = labels.to(fgsm_device)
+        adversarail_images, _ = fgsm.generate(images, labels)
+        with torch.no_grad():
+            adversarail_images = adversarail_images.to(device)
+
+            outputs = model(adversarail_images)
+            _, predicted_top1 = torch.max(outputs, 1)
+            _, predicted_top5 = torch.topk(outputs, k=5, dim=1)
+            
+            predictions_top1.extend(predicted_top1.cpu().numpy())
+            predictions_top5.extend(predicted_top5.cpu().numpy())
+            true_labels.extend(labels.cpu().numpy())
+    
+    return predictions_top1, predictions_top5, true_labels
+
+def calculate_accuracy(predictions_top1, predictions_top5, true_labels):
+    # acc@1
+    acc_top1 = sum(p == t for p, t in zip(predictions_top1, true_labels)) / len(true_labels)
+    # acc@5
+    acc_top5 = sum(t in p for p, t in zip(predictions_top5, true_labels)) / len(true_labels)
+    return acc_top1, acc_top5
+    
 
 def main():
     # Set up model
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    
     model = setup_model(device)
     
     # Set ImageNet validation directory
     IMAGENET_1K_VAL_DIR = os.environ["IMAGENET_1K_VAL_DIR"]
 
-    # Set up data loader
+    # Set up dataset and dataloader
     batch_size = 32
     val_dataset, val_loader = setup_validation_data(IMAGENET_1K_VAL_DIR, batch_size=batch_size) # Update environment variable with path to ImageNet validation data
 
-
-    # NOTE: Turns out we cannot use cuda with default torch.multiprocessing start.
-    # mp.set_start_method('spawn', force=True) is required at the beginning of the script.
-    # However, this spawns as many models as there are workers defined in DataLoader.
-    model_cpu = setup_model(torch.device('cuda'))
-    val_adver_dataset, val_adver_loader = setup_validation_adversarial_data(val_dataset, model_cpu, epsilon=0.05, batch_size=batch_size)
-    print(val_adver_dataset.fgsm.device)
     # Verify dataset size
     assert len(val_dataset) == 50000, "Validation dataset should have 50,000 images"
-    
-    # Make predictions on original validation data
-    # predictions, true_labels = predict(model, val_loader)
 
-    # Make predictions on adversarial validation data
-    predictions, true_labels = predict(model, val_adver_loader)
+    # FGSM
+    model_fgsm = setup_model(torch.device('cuda'))
+    fgsm = FGSM(model_fgsm, epsilon=0.05)
+
+    # Benchmark original dataset
+    predictions_top1, predictions_top5, true_labels = predict(model, val_loader)
+    accuracy_top1, accuracy_top5 = calculate_accuracy(predictions_top1, predictions_top5, true_labels)
+
+    # Benchmark adversarial dataset
+    predictions_top1_adver, predictions_top5_adver, true_labels_adver = predict_adversarial(model, val_loader, fgsm)
+    accuracy_top1_adver, accuracy_top5_adver = calculate_accuracy(predictions_top1_adver, predictions_top5_adver, true_labels_adver)
     
-    # Calculate accuracy
-    accuracy = sum(p == t for p, t in zip(predictions, true_labels)) / len(predictions)
-    print(f"Validation Accuracy: {accuracy:.4f}")
+    print(f"Original acc@1   : {accuracy_top1:.4f}")
+    print(f"Original acc@5   : {accuracy_top5:.4f}")
+    print(f"Adversarial acc@1: {accuracy_top1_adver:.4f}")
+    print(f"Adversarial acc@5: {accuracy_top5_adver:.4f}")
 
     # resnet18 validation acc@1: 0.6976
     # resnet18 adversarial validation acc@1: 0.0124

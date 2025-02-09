@@ -11,15 +11,17 @@ class FGSM:
         self.epsilon = epsilon
         self.criterion = nn.CrossEntropyLoss()
     
-    def generate(self, image: torch.Tensor, target: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def generate(self, image: torch.Tensor, target: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         # Enable gradients for input image
         image.requires_grad = True
         
         # forward pass
         output = self.model(image.to(self.device))
+
+        # print(output.shape, target.shape)
         
         # Calculate loss
-        loss = self.criterion(output, torch.tensor([target]).to(self.device))
+        loss = self.criterion(output, target.to(self.device))
         
         # backward pass
         loss.backward()
@@ -47,7 +49,7 @@ class AdversarialDataset(Dataset):
         
     def __getitem__(self, idx):
         image, label = self.base_dataset[idx]
-        adversarial_image, _ = self.fgsm.generate(image.unsqueeze(0), label)
+        adversarial_image, _ = self.fgsm.generate(image.unsqueeze(0), torch.tensor([label]))
         return adversarial_image.squeeze(0), label
 
 
@@ -55,8 +57,8 @@ if __name__ == "__main__":
     from model_inference import setup_model, ImageNetValidationDataset
 
     # Setup model
-    device = torch.device("cpu")
-    # device = torch.device("cuda")
+    # device = torch.device("cpu")
+    device = torch.device("cuda")
     model = setup_model(device)
 
     # Setup validation data
@@ -110,7 +112,7 @@ if __name__ == "__main__":
     axes[0].set_title("Original Image")
     axes[1].imshow(adversarial_image_viz)
     axes[1].set_title("Adversarial Image")
-    plt.show()
+    # plt.show()
 
     # move images to the same device as model
     image = image.to(device)
@@ -127,4 +129,32 @@ if __name__ == "__main__":
         print(f"Adversarial Image Prediction: {predicted.item()}")
 
         print(f"Original Image Label: {label}")
+    
 
+    # test how we can apply this transform to a batch instead
+    # create data loader
+
+    from torch.utils.data import DataLoader
+
+    batch_size = 32
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=4
+    )
+
+    # create FGSM object
+    fgsm = FGSM(model, epsilon)
+
+    # make a prediction on the batch
+    for images, labels in val_loader:
+        images = images.to(device)
+        labels = labels.to(device)
+        adversarial_images, _ = fgsm.generate(images, labels)
+        # print(adversarial_images.shape)
+        # break
+        with torch.no_grad():
+            outputs = model(adversarial_images)
+            _, predicted = torch.max(outputs, 1)
+            break
