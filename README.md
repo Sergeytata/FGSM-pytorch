@@ -20,7 +20,7 @@ The project also includes a benchmarking of the adversarial transformation on Im
 
 ```bash
 # Clone the repository
-git clone
+git clone https://github.com/Sergeytata/FGSM-pytorch
 
 # Install dependencies
 pip install -r requirements.txt
