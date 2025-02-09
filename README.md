@@ -53,7 +53,7 @@ The adversarial transformation is effective in reducing the accuracy of the mode
 The adversarial transformation is not effective if FGSM model is different from the model being attacked. There is not enough evidence to suggest that the adversarial transformation is effective on models from the same family.
 
 ## Future Work
-- Use FLIP evaluate perceptual quality of images.
+- Use FLIP to evaluate perceptual quality of images.
 - Attempt to train epsilon as a parameter using FLIP loss as a perceptual quality loss.
 - Attempt to generalise the adversarial transformation to attack unknown models.
 
