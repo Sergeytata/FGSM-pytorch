@@ -1,7 +1,11 @@
 import torch
-import torchvision
 import torchvision.transforms as transforms
-from torchvision.models import resnet18, ResNet18_Weights
+from torchvision.models import (
+    resnet18, ResNet18_Weights,
+    resnet50, ResNet50_Weights,
+    convnext_tiny, ConvNeXt_Tiny_Weights,
+    convnext_small, ConvNeXt_Small_Weights
+)
 from torch.utils.data import DataLoader, Dataset
 from pathlib import Path
 from PIL import Image
@@ -10,7 +14,7 @@ import json
 from tqdm import tqdm
 import os
 
-from adversarial_transform import AdversarialDataset, FGSM
+from adversarial_transform import FGSM
 
 
 class ImageNetValidationDataset(Dataset):
@@ -42,12 +46,21 @@ class ImageNetValidationDataset(Dataset):
             
         return image, label
 
-def setup_model(device=torch.device('cpu')):
-    # Load pretrained ResNet18
-    weights = ResNet18_Weights(ResNet18_Weights.DEFAULT)
-    model = resnet18(weights=weights)
+def setup_model(model_name="resnet18", device=torch.device('cpu')):
+    model_configs = {
+        'resnet18': (resnet18, ResNet18_Weights.DEFAULT),
+        'resnet50': (resnet50, ResNet50_Weights.DEFAULT),
+        'convnext_tiny': (convnext_tiny, ConvNeXt_Tiny_Weights.DEFAULT),
+        'convnext_small': (convnext_small, ConvNeXt_Small_Weights.DEFAULT)
+    }
+    
+    if model_name not in model_configs:
+        raise ValueError(f"Model {model_name} not supported. Choose from {list(model_configs.keys())}")
+    
+    model_fn, weights = model_configs[model_name]
+    model = model_fn(weights=weights)
     model.eval()
-    return model.to(device) 
+    return model.to(device)
 
 def setup_validation_data(val_dir, batch_size=32):
     # Standard ImageNet transforms
@@ -87,23 +100,6 @@ def setup_validation_data(val_dir, batch_size=32):
     return val_dataset, val_loader
 
 
-def setup_validation_adversarial_data(val_dataset, model, epsilon=0.05, batch_size=32):
-    # Create adversarial dataset
-    adversarial_dataset = AdversarialDataset(
-        val_dataset, 
-        model, 
-        epsilon)
-        
-    # Create DataLoader
-    val_loader = DataLoader(
-        adversarial_dataset,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=4
-    )
-    
-    return adversarial_dataset, val_loader
-
 def predict(model, val_loader):
     device = model.parameters().__next__().device
     predictions_top1 = []
@@ -128,7 +124,7 @@ def predict_adversarial(model, val_loader, fgsm):
     device = model.parameters().__next__().device
     fgsm_device = fgsm.model.parameters().__next__().device
     if device != fgsm_device:
-        print("[Warning]: Model and FGSM model should be on the same device!")
+        print("[Warning]: Model and FGSM model are not on the same device!")
     predictions_top1 = []
     predictions_top5 = []
     true_labels = []
@@ -161,7 +157,7 @@ def calculate_accuracy(predictions_top1, predictions_top5, true_labels):
 def main():
     # Set up model
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    model = setup_model(device)
+    model = setup_model("resnet18", device)
     
     # Set ImageNet validation directory
     IMAGENET_1K_VAL_DIR = os.environ["IMAGENET_1K_VAL_DIR"]
@@ -174,7 +170,7 @@ def main():
     assert len(val_dataset) == 50000, "Validation dataset should have 50,000 images"
 
     # FGSM
-    model_fgsm = setup_model(device)
+    model_fgsm = setup_model("resnet18", device)
     fgsm = FGSM(model_fgsm, epsilon=0.05)
 
     # Benchmark original dataset

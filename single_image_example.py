@@ -38,28 +38,37 @@ def main():
     # Create adversarial image
     adversarial_image, _ = fgsm.generate(image.unsqueeze(0), torch.tensor([label]))
 
+    # test model on original and adversarial image
+    with torch.no_grad():
+        output = model(image.unsqueeze(0).to(device))
+        output_adv = model(adversarial_image.to(device))
+
+        print(f"Original Image: {output.argmax()}")
+        print(f"Adversarial Image: {output_adv.argmax()}")
+        print(f"Ground Truth Label: {label}")
+    
+
     # squeeze batch dimension
-    image = image.squeeze(0)
-    adversarial_image = adversarial_image.squeeze(0)
+    image_viz = image.squeeze(0)
+    adversarial_image_viz = adversarial_image.squeeze(0)
 
 
     # reverse normalization to visualise images for perceptual difference
-    image_viz = image * torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1) + torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
-    adversarial_image_viz = adversarial_image * torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1) + torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+    image_viz = image_viz * torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1) + torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+    adversarial_image_viz = adversarial_image_viz * torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1) + torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
 
     image_viz = torch.clamp(image_viz, 0, 1).permute(1, 2, 0)
     adversarial_image_viz = torch.clamp(adversarial_image_viz, 0, 1).permute(1, 2, 0)
 
     fig, axes = plt.subplots(1, 2, figsize=(10, 5))
     axes[0].imshow(image_viz)
-    axes[0].set_title("Original Image")
+    axes[0].set_title(f"Original Image - pred id: {output.argmax().item()}")
     axes[1].imshow(adversarial_image_viz)
-    axes[1].set_title("Adversarial Image")
+    axes[1].set_title(f"Adversarial Image - pred id: {output_adv.argmax().item()}")
 
     os.makedirs("output", exist_ok=True)
     fig.savefig("output/result.png")
 
-    return
 
 if __name__ == "__main__":
     main()
