@@ -52,14 +52,15 @@ The project is designed as an integration with evaluation or training pipelines.
 
 ```python
 # %Your project imports%
-from adversarial_transform import FGSM
+from adversarial_transform import FGSM, FPGSMConfig
 
 
 # % Your project code%
 
 # Create FGSM object
-epsilon = 0.05
-fgsm = FGSM(model, epsilon)
+adv_target = 301 # attack target
+config = FPGSMConfig(epsilon=0.01, steps=7, beta=0.5)
+fgsm = FGSM(model_fgsm, config=config)
 
 
 # Training or evaluation pipeline
@@ -68,8 +69,8 @@ fgsm_device = fgsm.model.parameters().__next__().device
 # Training/Evaluation loop example
 for images, labels in tqdm(val_loader):
     images = images.to(fgsm_device)
-    labels = labels.to(fgsm_device)
-    adversarail_images, _ = fgsm.generate(images, labels)
+    adv_labels = torch.full_like(labels, adv_target).to(fgsm_device)
+    adversarail_images, _ = fgsm.generate(images, adv_labels)
 
     # %Your training loop in here%
 
@@ -88,11 +89,16 @@ single_image_example.py - single image adversarial transformation.
 model_inference.py - ImageNet-1k-val benchmarking.
 
 ## Results
-I use resnet18, resnet50, and ConvNeXt Tiny models to benchmark the adversarial transformation on ImageNet-1k-val dataset with epsilon set to 0.05. 
+
+I use resnet18, resnet50, and ConvNeXt Tiny models to benchmark untargeted and targeted the adversarial attacks on ImageNet-1k-val dataset.
+
+### Untargeted
+steps = 1 \
+beta = 1.0 \
+epsilon = 0.05
 
 Additionally, I explore extrapolation of resnet18 as an FGSM model to measure the effectiveness of the method on other unknown models from the same family and not.
 The results are shown in the table below:
-
 
 |      Experiment \ Model      | ResNet18 | ResNet50 | ConvNeXt Tiny |
 |------------------------------|----------|----------|---------------|
@@ -103,15 +109,36 @@ The results are shown in the table below:
 | acc@1 + FGSM (convnext_tiny) |  ------  |  ------  |    34.07%     |
 | acc@5 + FGSM (convnext_tiny) |  ------  |  ------  |    57.69%     |
 
+### Targeted
+Targeted attack requires multiple smaller epsilon value to preserve image quality, presumably because of higher gradients when the loss is calculated with respect to the target from a different class.
+
+epsilon = 0.01 \
+beta = 0.5 \
+target = 301 (ladybug)
+
+|        Experiment \ Model        | ResNet18 | ResNet50 | ConvNeXt Tiny |
+|----------------------------------|----------|----------|---------------|
+| acc@1 + FGSM (resnet18, steps=1) |   1.85%  |  ------  |    ------     |
+| acc@5 + FGSM (resnet18, steps=1) |   5.71%  |  ------  |    ------     |
+| acc@1 + FGSM (resnet18, steps=3) |  33.57%  |  ------  |    ------     |
+| acc@5 + FGSM (resnet18, steps=3) |  50.44%  |  ------  |    ------     |
+| acc@1 + FGSM (resnet18, steps=7) |  53.64%  |  ------  |    ------     |
+| acc@5 + FGSM (resnet18, steps=7) |  69.74%  |  ------  |    ------     |
+
+
+
 ## Conclusion
 The adversarial transformation is effective in reducing the accuracy of the models if the weights are aviailable. The adversarial transformation is more effective on older models with ReLU activation functions than newer models with more complex activation functions. 
 
 The adversarial transformation is not effective if FGSM model is different from the model being attacked. There is not enough evidence to suggest that the adversarial transformation is effective on models from the same family.
 
+Targeted attacks are more difficult and require multiple perturbations to be effective. Higher number of steps increases the effectiveness of the attack, but also require epsilon scaling to maintain the perceptual quality of the image.
+
 ## Future Work
-- Use FLIP to evaluate perceptual quality of images.
-- Attempt to train epsilon as a parameter using FLIP loss as a perceptual quality loss.
+- Use FLIP as a perceptual quality metric.
+- Attempt to train epsilon and beta as parameters using FLIP loss as a perceptual quality loss.
 - Attempt to generalise the adversarial transformation to attack unknown models.
+
 
 ## References
 - [Explaining and Harnessing Adversarial Examples](https://arxiv.org/abs/1412.6572)

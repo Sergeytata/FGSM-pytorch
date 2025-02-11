@@ -5,7 +5,7 @@ import torchvision.transforms as transforms
 import os
 import matplotlib.pyplot as plt
 
-from adversarial_transform import FGSM
+from adversarial_transform import FGSM, FPGSMConfig
 
 def main():
     # Setup model
@@ -16,8 +16,8 @@ def main():
     model = model.to(device)
 
     # FGSM
-    epsilon = 0.05
-    fgsm = FGSM(model, epsilon)
+    config = FPGSMConfig(epsilon=0.01, steps=5, beta=0.5)
+    fgsm = FGSM(model, config)
 
 
     # load data/panda.JPEG
@@ -32,11 +32,12 @@ def main():
     ])
 
     image = Image.open("data/panda.JPEG").convert('RGB')
-    label = 388 # panda label
+    gt_label = 388 # panda label
+    adv_label = 301 # attack label
     image = transform(image)
 
     # Create adversarial image
-    adversarial_image, _ = fgsm.generate(image.unsqueeze(0), torch.tensor([label]))
+    adversarial_image, _ = fgsm.generate(image.unsqueeze(0), torch.tensor([adv_label]), targeted=True)
 
     # test model on original and adversarial image
     with torch.no_grad():
@@ -45,7 +46,8 @@ def main():
 
         print(f"Original Image: {output.argmax()}")
         print(f"Adversarial Image: {output_adv.argmax()}")
-        print(f"Ground Truth Label: {label}")
+        print(f"Ground Truth Label: {gt_label}")
+        print(f"Adversarial Label: {adv_label}")
     
 
     # squeeze batch dimension
@@ -60,7 +62,7 @@ def main():
     image_viz = torch.clamp(image_viz, 0, 1).permute(1, 2, 0)
     adversarial_image_viz = torch.clamp(adversarial_image_viz, 0, 1).permute(1, 2, 0)
 
-    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5), dpi=200)
     axes[0].imshow(image_viz)
     axes[0].set_title(f"Original Image - pred id: {output.argmax().item()}")
     axes[1].imshow(adversarial_image_viz)

@@ -14,7 +14,7 @@ import json
 from tqdm import tqdm
 import os
 
-from adversarial_transform import FGSM
+from adversarial_transform import FGSM, FPGSMConfig
 
 
 class ImageNetValidationDataset(Dataset):
@@ -94,7 +94,8 @@ def setup_validation_data(val_dir, batch_size=32):
         val_dataset,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=4
+        num_workers=4,
+        drop_last=True
     )
     
     return val_dataset, val_loader
@@ -120,7 +121,7 @@ def predict(model, val_loader):
     
     return predictions_top1, predictions_top5, true_labels
 
-def predict_adversarial(model, val_loader, fgsm):
+def predict_adversarial(model, val_loader, fgsm, target=None):
     device = model.parameters().__next__().device
     fgsm_device = fgsm.model.parameters().__next__().device
     if device != fgsm_device:
@@ -128,11 +129,24 @@ def predict_adversarial(model, val_loader, fgsm):
     predictions_top1 = []
     predictions_top5 = []
     true_labels = []
+
+    if target is not None:
+        B = val_loader.batch_size
+        adv_labels = torch.tensor([target] * B).to(fgsm_device)
+        targeted = True
+    else:
+        targeted = False
     
     for images, labels in tqdm(val_loader):
         images = images.to(fgsm_device)
-        labels = labels.to(fgsm_device)
-        adversarail_images, _ = fgsm.generate(images, labels)
+
+        if targeted:
+            labels = adv_labels
+        else:
+            labels = labels.to(fgsm_device)
+        
+        adversarail_images, _ = fgsm.generate(images, labels, targeted)
+
         with torch.no_grad():
             adversarail_images = adversarail_images.to(device)
 
@@ -171,15 +185,17 @@ def main():
 
     # FGSM
     model_fgsm = setup_model("resnet18", device)
-    fgsm = FGSM(model_fgsm, epsilon=0.05)
+    config = FPGSMConfig(epsilon=0.01, steps=3, beta=0.5)
+    fgsm = FGSM(model_fgsm, config=config)
 
     # Benchmark original dataset
     predictions_top1, predictions_top5, true_labels = predict(model, val_loader)
     accuracy_top1, accuracy_top5 = calculate_accuracy(predictions_top1, predictions_top5, true_labels)
 
     # Benchmark adversarial dataset
-    predictions_top1_adver, predictions_top5_adver, true_labels_adver = predict_adversarial(model, val_loader, fgsm)
-    accuracy_top1_adver, accuracy_top5_adver = calculate_accuracy(predictions_top1_adver, predictions_top5_adver, true_labels_adver)
+    adv_label = 301 # attack label
+    predictions_top1_adver, predictions_top5_adver, adv_labels = predict_adversarial(model, val_loader, fgsm, adv_label)
+    accuracy_top1_adver, accuracy_top5_adver = calculate_accuracy(predictions_top1_adver, predictions_top5_adver, adv_labels)
     
     print(f"Original acc@1   : {accuracy_top1:.4f}")
     print(f"Original acc@5   : {accuracy_top5:.4f}")
