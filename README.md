@@ -70,7 +70,7 @@ fgsm_device = fgsm.model.parameters().__next__().device
 for images, labels in tqdm(val_loader):
     images = images.to(fgsm_device)
     adv_labels = torch.full_like(labels, adv_target).to(fgsm_device)
-    adversarail_images, _ = fgsm.generate(images, adv_labels)
+    adv_images, _ = fgsm.generate(images, adv_labels)
 
     # %Your training loop in here%
 
@@ -90,7 +90,7 @@ model_inference.py - ImageNet-1k-val benchmarking.
 
 ## Results
 
-I use resnet18, resnet50, and ConvNeXt Tiny models to benchmark untargeted and targeted the adversarial attacks on ImageNet-1k-val dataset.
+I use resnet18, resnet50, and ConvNeXt Tiny models to benchmark untargeted and targeted adversarial attacks on ImageNet-1k-val dataset.
 
 ### Untargeted
 steps = 1 \
@@ -110,11 +110,12 @@ The results are shown in the table below:
 | acc@5 + FGSM (convnext_tiny) |  ------  |  ------  |    57.69%     |
 
 ### Targeted
-Targeted attack requires multiple smaller epsilon value to preserve image quality, presumably because of higher gradients when the loss is calculated with respect to the target from a different class.
+Targeted attack uses smaller epsilon value to preserve image quality, presumably because of higher gradients calculated with respect to the target from a different class. Additionally, I explore the effectiveness of multi-step perturbations to increase the effectiveness of the algorithm.
 
 epsilon = 0.01 \
 beta = 0.5 \
 target = 301 (ladybug)
+
 
 |        Experiment \ Model        | ResNet18 | ResNet50 | ConvNeXt Tiny |
 |----------------------------------|----------|----------|---------------|
@@ -126,6 +127,7 @@ target = 301 (ladybug)
 | acc@5 + FGSM (resnet18, steps=7) |  69.74%  |  ------  |    ------     |
 
 
+acc@1 and acc@5 are calculated for the attack target.
 
 ## Conclusion
 The adversarial transformation is effective in reducing the accuracy of the models if the weights are aviailable. The adversarial transformation is more effective on older models with ReLU activation functions than newer models with more complex activation functions. 
